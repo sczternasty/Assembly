@@ -31,7 +31,9 @@ decode_loop:
 	shlq	$3, %rbx # shift left by 3 = multiply by 8
 	addq	%r12, %rbx # base + (index * 8) = current block address
 
-	movq	(%rbx), %rdx # copy the block
+	movq	(%rbx), %rax # load the current block
+
+	movq	%rax, %rdx # copy the block
 	shrq	$16, %rdx # shift right 16 bits to get bytes 2-7
 	movl	%edx, %edx # clear upper 32 bits to get bytes 2-5
 	movq	%rdx, %rbx # move index to rbx for next iteration
@@ -48,8 +50,9 @@ decode_loop:
 
 print_loop:
 	movq	%rsi, %rdi # first parameter for putchar
+	pushq 	%rcx 
 	call	putchar # call print character
-
+	popq	%rcx
 	decq	%rcx # decrement counter
 	jnz	print_loop # if not zero, continue printing
 
