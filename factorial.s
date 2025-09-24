@@ -29,7 +29,7 @@ main:
     call printf # call printf
     
     # Read input
-    subq $16, %rsp # allocate space on stack for 1 long integer
+    subq $8, %rsp # allocate space on stack for 1 long integer
     movq $input, %rdi # first scanf argument
     leaq -8(%rbp), %rsi # load address of input
     movq $0, %rax # no floating point arguments
