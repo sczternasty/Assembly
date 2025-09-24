@@ -22,23 +22,19 @@ decode:
 
 	pushq	%rbx # save callee-saved register
 	pushq	%r12 # save callee-saved register
-	pushq	%r13 # save callee-saved register
 
 	movq	%rdi, %r12 # base address of message
-	movq	$0, %r13 # current index = 0
+	movq	$0, %rbx # current index = 0
 
 decode_loop:
 
-	movq	%r13, %rbx # copy current index
 	shlq	$3, %rbx # shift left by 3 = multiply by 8
 	addq	%r12, %rbx # base + (index * 8) = current block address
 
-	movq	(%rbx), %rax # copy 8-byte block
-
-	movq	%rax, %rdx # copy the block
+	movq	(%rbx), %rdx # copy the block
 	shrq	$16, %rdx # shift right 16 bits to get bytes 2-7
 	movl	%edx, %edx # clear upper 32 bits to get bytes 2-5
-	movq	%rdx, %r13 # next index
+	movq	%rdx, %rbx # move index to rbx for next iteration
 
 	movq	%rax, %rcx # copy the block
 	shrq	$8, %rcx # shift right 8 bits
@@ -52,22 +48,17 @@ decode_loop:
 
 print_loop:
 	movq	%rsi, %rdi # first parameter for putchar
-	pushq	%rcx # save loop counter
-	pushq	%r13 # save next index
 	call	putchar # call print character
-	popq	%r13 # restore next index
-	popq	%rcx # restore loop counter
 
 	decq	%rcx # decrement counter
 	jnz	print_loop # if not zero, continue printing
 
 termination:
-	testq	%r13, %r13 # check if next index is 0
-	jz	decode_end	# if next index is 0, end decoding
+	testq	%rbx, %rbx # check if next index is 0
+	jz	decode_exit	# if next index is 0, end decoding
 	jmp	decode_loop # otherwise, continue decoding
 
 decode_exit:
-	popq	%r13 # restore callee-saved register
 	popq	%r12 # restore callee-saved register
 	popq	%rbx # restore callee-saved register
 	

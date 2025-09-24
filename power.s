@@ -19,8 +19,8 @@ main:
     # Print description
     movq $0, %rax   # no floating point arguments
     movq $format, %rdi # first printf argument
-    movq $names, %rsi  # second printf argument
-    movq $netid, %rdx  # third printf argument
+    movq $names, %rsi # second printf argument
+    movq $netid, %rdx # third printf argument
     movq $assignment, %rcx  # fourth printf argument
     call printf  # call printf
 
