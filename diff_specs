@@ -1,0 +1,105 @@
+main()
+{
+    // Read command line arguments
+    argc = number_of_arguments()
+    argv = argument_list()
+
+    // Initialize flags
+    flag_i = 0       // ignore case flag (-i)
+    flag_B = 0       // ignore blank lines flag (-B)
+
+    // Parse command line options
+    if (argc > 1) {
+        for each argument in argv {
+            if (argument == "-i")
+                flag_i = 1
+            if (argument == "-B")
+                flag_B = 1
+        }
+    }
+
+    // Compare the two hardcoded files
+    diff(file1, file2, flag_i, flag_B)
+}
+
+diff(file1_pointer, file2_pointer, flag_i, flag_B)
+{
+    // Initialize line counters
+    line_num1 = 1
+    line_num2 = 1
+
+    // Loop until both files are fully read
+    while (not end_of(file1) or not end_of(file2))
+    {
+        // Read a line from each file
+        line1 = get_line(file1_pointer)
+        line2 = get_line(file2_pointer)
+
+        // Process both lines based on flags
+        processed1 = process_line(line1, flag_i, flag_B)
+        processed2 = process_line(line2, flag_i, flag_B)
+
+        // Handle -B option: skip blank lines
+        if (flag_B == 1 and processed1 is empty) {
+            line_num1 = line_num1 + 1
+            continue
+        }
+        if (flag_B == 1 and processed2 is empty) {
+            line_num2 = line_num2 + 1
+            continue
+        }
+
+        // Compare the processed lines
+        if (strcmp(processed1, processed2) != 0)
+        {
+            // Lines are different — print diff-style output
+            print(line_num1 + "c" + line_num2 + "\n")
+            print("< " + line1)
+            print("---\n")
+            print("> " + line2)
+        }
+
+        // Increment both line counters
+        line_num1 = line_num1 + 1
+        line_num2 = line_num2 + 1
+    }
+}
+
+
+get_line(file_pointer)
+{
+    buffer = ""
+    while (next_character != '\n' and not EOF)
+        buffer = buffer + next_character
+    return buffer
+}
+
+process_line(line, flag_i, flag_B)
+{
+    new_line = ""
+
+    for each character c in line {
+        if (flag_B == 1 and (c == ' ' or c == '\t'))
+            continue                     // skip blank characters
+
+        if (flag_i == 1)
+            c = to_lowercase(c)          // convert uppercase to lowercase
+
+        if (c != '\n')
+            new_line = new_line + c      // store valid characters
+    }
+
+    return new_line
+}
+
+
+strcmp(str1, str2)
+{
+    index = 0
+    while (str1[index] == str2[index]) {
+        if (str1[index] == '\0')
+            return 0                     // strings are equal
+        index = index + 1
+    }
+    return (str1[index] - str2[index])   // difference
+}
