@@ -114,7 +114,7 @@ diff_loop:
     movq $1024, %rdx            # max length
     call get_line               # read line
     movq %rax, %r12             # r12 = number of chars read
-    movq %rbx, -8(%rbp)         # Update file1 pointer
+    movq %rdx, -8(%rbp)         # Update file1 pointer
 
     # read line from file2
     movq -16(%rbp), %rdi        # file2 pointer
@@ -122,7 +122,7 @@ diff_loop:
     movq $1024, %rdx            # max length
     call get_line               # read line
     movq %rax, %r13             # r13 = number of chars read
-    movq %rbx, -16(%rbp)        # Update file2 pointer
+    movq %rdx, -16(%rbp)        # Update file2 pointer
 
     # check for EOF
     testq %r12, %r12            # check if file1 ended
@@ -276,7 +276,7 @@ getline_loop:
 
 getline_end:
     movb $0, (%r9)        # null-terminate line
-    movq %r8, %rbx        # save new pointer for next call
+    movq %r8, %rdx        # save new pointer for next call
 
     # epilogue
     movq %rbp, %rsp
