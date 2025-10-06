@@ -45,14 +45,14 @@ parse_loop:
 
     # -i option
     movq (%r15,%rcx,8), %rdi    # argv[rcx]
-    leaq opt_i(%rip), %rsi      # memory address of "-i"
+    movq $opt_i, %rsi      # memory address of "-i"
     call strcmp                 # compare strings
     testq %rax, %rax            # check if equal
     jz set_i
 
     # -B option
     movq (%r15,%rcx,8), %rdi   # argv[rcx]
-    leaq opt_B(%rip), %rsi           # memory address of "-B"
+    movq $opt_B, %rsi           # memory address of "-B"
     call strcmp                # compare strings
     testq %rax, %rax           # check if equal
     jz set_B
@@ -71,8 +71,8 @@ next_arg:
     jmp parse_loop
 
 call_diff:
-    leaq file1(%rip), %rdi  # load address of file1
-    leaq file2(%rip), %rsi  # load address of file2
+    movq $file1, %rdi  # load address of file1
+    movq $file2, %rsi  # load address of file2
     movq %r12, %rdx         # flag_i
     movq %r13, %rcx         # flag_B
     call diff
@@ -110,7 +110,7 @@ diff:
 diff_loop:
     # read line from file1
     movq -8(%rbp), %rdi         # file1 pointer
-    leaq line1_buf(%rip), %rsi  # buffer for line1
+    movq $line1_buf, %rsi  # buffer for line1
     movq $1024, %rdx            # max length
     call get_line               # read line
     movq %rax, %r12             # r12 = number of chars read
@@ -118,7 +118,7 @@ diff_loop:
 
     # read line from file2
     movq -16(%rbp), %rdi        # file2 pointer
-    leaq line2_buf(%rip), %rsi  # buffer for line2
+    movq $line2_buf, %rsi  # buffer for line2
     movq $1024, %rdx            # max length
     call get_line               # read line
     movq %rax, %r13             # r13 = number of chars read 
@@ -135,17 +135,17 @@ check_file1_end:
     # file2 ended but file1 has more lines
     movq %r14, %rdi             # line number from file1
     call print_num              
-    leaq change_c(%rip), %rdi   # change context
+    movq $change_c, %rdi       # change context
     call print_str
     movq %r15, %rdi             # line number from file2
     call print_num
-    movq newline, %rdi          
+    movq $newline, %rdi          
     call print_str
-    leaq less_than(%rip), %rdi  
+    movq $less_than, %rdi
     call print_str
-    leaq line1_buf(%rip), %rdi
+    movq $line1_buf, %rdi
     call print_str
-    leaq separator(%rip), %rdi
+    movq $separator, %rdi
     call print_str
     incq %r14                  # increment line number for file1
     jmp diff_loop
@@ -156,28 +156,28 @@ check_file2_end:
     # file1 ended but file2 has more lines - show as addition
     movq %r14, %rdi            # line number from file1
     call print_num
-    leaq change_c(%rip), %rdi  # change context
+    movq $change_c, %rdi       # change context
     call print_str
     movq %r15, %rdi            # line number from file2
     call print_num
-    leaq newline(%rip), %rdi
+    movq $newline, %rdi
     call print_str
-    leaq separator(%rip), %rdi
+    movq $separator, %rdi
     call print_str
-    leaq greater(%rip), %rdi
+    movq $greater, %rdi
     call print_str
-    leaq line2_buf(%rip), %rdi
+    movq $line2_buf, %rdi
     call print_str
     incq %r15                  # increment line number for file2
     jmp diff_loop
 
 process_lines:
-    leaq line1_buf(%rip), %rdi          # address of line1
-    leaq line1_processed(%rip), %rsi    # destination buffer
-    movq -24(%rbp), %rdx                # flag_i
-    movq -32(%rbp), %rcx                # flag_B
+    movq $line1_buf, %rdi          # address of line1
+    movq $line1_processed, %rsi    # destination buffer
+    movq -24(%rbp), %rdx            # flag_i
+    movq -32(%rbp), %rcx            # flag_B
     call process_line
-    movq %rax, %r12                     # r12 = length of processed line1
+    movq %rax, %r12                 # r12 = length of processed line1
 
     cmpq $0, -32(%rbp)                  # if -B option not set, skip blank line check
     je process_line2
@@ -187,12 +187,12 @@ process_lines:
     jmp diff_loop
 
 process_line2:
-    leaq line2_buf(%rip), %rdi          # address of line2
-    leaq line2_processed(%rip), %rsi    # destination buffer
-    movq -24(%rbp), %rdx                # flag_i
-    movq -32(%rbp), %rcx                # flag_B
+    movq $line2_buf, %rdi          # address of line2
+    movq $line2_processed, %rsi    # destination buffer
+    movq -24(%rbp), %rdx            # flag_i
+    movq -32(%rbp), %rcx            # flag_B
     call process_line
-    movq %rax, %r13                     # r13 = length of processed line2
+    movq %rax, %r13                 # r13 = length of processed line2
 
     cmpq $0, -32(%rbp)                  # if -B option not set, skip blank line check
     je compare_lines
@@ -202,33 +202,33 @@ process_line2:
     jmp diff_loop
 
 compare_lines:
-    leaq line1_processed(%rip), %rdi   # processed line1
-    leaq line2_processed(%rip), %rsi   # processed line2
+    movq $line1_processed, %rdi   # processed line1
+    movq $line2_processed, %rsi   # processed line2
     call strcmp
     testq %rax, %rax
     jz lines_equal       # lines are equal, skip printing
 
     # lines differ
     movq %r14, %rdi            # line number from file1
-    call print_num 
-    leaq change_c(%rip), %rdi  # change context
+    call print_num
+    movq $change_c, %rdi       # change context
     call print_str
     movq %r15, %rdi            # line number from file2
     call print_num
-    leaq newline(%rip), %rdi   
+    movq $newline, %rdi
     call print_str
 
-    leaq less_than(%rip), %rdi
+    movq $less_than, %rdi
     call print_str
-    leaq line1_buf(%rip), %rdi 
-    call print_str
-
-    leaq separator(%rip), %rdi
+    movq $line1_buf, %rdi
     call print_str
 
-    leaq greater(%rip), %rdi
+    movq $separator, %rdi
     call print_str
-    leaq line2_buf(%rip), %rdi
+
+    movq $greater, %rdi
+    call print_str
+    movq $line2_buf, %rdi
     call print_str
 
 lines_equal:
