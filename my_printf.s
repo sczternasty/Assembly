@@ -45,6 +45,7 @@ my_printf:
     movq    $0, %r11            # argument index
 
 format_loop:
+    movq    $0, %rax            # clear rax for safety
     movb    (%r10), %al         # load 8 bits (1 char) to lower byte of RAX
     testb   %al, %al            # check if lower byte is 0
     jz      format_done         # jump to done if null terminator
@@ -103,7 +104,7 @@ uint:
     jmp     format_loop         # go back to format loop
 
 double_percent:
-    movb    $'%', %dil          # ASCII for '%'
+    movb    $37, %dil          # ASCII for '%'
     call    print_char          # print '%'
     incq    %r10                # move to next character
     jmp     format_loop         # go back to format loop
@@ -123,10 +124,6 @@ format_done:
     popq    %rbp
     ret
 
-
-# ---------------------------
-# get_current_arg (fixed with lea)
-# ---------------------------
 get_current_arg:
     # determine where the argument is based on index in %r11
     # arguments 0-4 are in registers (saved on our stack), 5+ are on caller's stack
@@ -141,7 +138,7 @@ get_current_arg:
     cmpq    $4, %r11
     je      get_arg4
 
-    # For args >= 5 (index 5 = 6th overall arg), compute:
+    # For args >= 5
     # addr = rbp + 16 + 8 * (index - 5)
     movq    %r11, %rax        # rax = index
     subq    $5, %rax          # rax = index - 5
@@ -156,9 +153,6 @@ get_arg3: movq -32(%rbp), %rax; ret
 get_arg4: movq -40(%rbp), %rax; ret
 
 
-# ---------------------------
-# print single character in %dil
-# ---------------------------
 print_char:
     pushq   %rax
     pushq   %rdi
@@ -183,10 +177,6 @@ print_char:
     popq    %rax
     ret
 
-
-# ---------------------------
-# print null-terminated string in RDI
-# ---------------------------
 print_string:
     testq   %rdi, %rdi             # check if string pointer is null
     jz      print_string_done      # if null, jump to done
@@ -200,7 +190,8 @@ print_string:
     movq    $0, %rdx               # length = 0
 
 len_loop:
-    movb    (%rsi), %al
+    movq    $0, %rax               # clear rax for safety
+    movb    (%rsi), %al            # load 1 byte (char) to lower byte of RAX
     testb   %al, %al
     jz      len_done
     incq    %rsi
@@ -211,7 +202,7 @@ len_done:
     movq    $1, %rax               # sys_write
     pushq   %rdi
     movq    $1, %rdi
-    popq    %rsi
+    popq    %rsi                   # beginning of string
     syscall
 
     popq    %r11
@@ -223,9 +214,7 @@ print_string_done:
     ret
 
 
-# ---------------------------
-# print_signed_int (argument in %rdi)
-# ---------------------------
+
 print_signed_int:
     pushq   %rax
     pushq   %rcx
@@ -239,7 +228,7 @@ print_signed_int:
 
     # negative number
     pushq   %rax                   # save original number
-    movb    $'-', %dil
+    movb    $45, %dil
     call    print_char             # print '-'
     popq    %rax                   # restore original number
     negq    %rax                   # make positive
@@ -254,15 +243,15 @@ positive_int:
     testq   %rax, %rax             # check if number is 0
     jnz     digit_loop
     decq    %rsi                   # move back one byte
-    movb    $'0', (%rsi)           # ASCII for '0'
+    movb    $48, (%rsi)           # ASCII for '0'
     jmp     print_int_string
 
 digit_loop:
     testq   %rax, %rax
     jz      print_int_string
-    xorq    %rdx, %rdx
+    movq    $0, %rdx
     divq    %rcx                   # rax = rax / 10, rdx = rax % 10
-    addb    $'0', %dl              # convert to ASCII
+    addb    $48, %dl              # convert to ASCII
     decq    %rsi                   # move back one byte
     movb    %dl, (%rsi)            # store digit
     jmp     digit_loop
@@ -279,10 +268,6 @@ print_int_string:
     popq    %rax
     ret
 
-
-# ---------------------------
-# print_unsigned_int (argument in %rdi)
-# ---------------------------
 print_unsigned_int:
     pushq   %rax
     pushq   %rcx
@@ -300,7 +285,7 @@ print_unsigned_int:
     testq   %rax, %rax
     jnz     udigit_loop
     decq    %rsi
-    movb    $'0', (%rsi)
+    movb    $48, (%rsi)
     jmp     print_uint_string
 
 udigit_loop:
@@ -308,7 +293,7 @@ udigit_loop:
     jz      print_uint_string
     xorq    %rdx, %rdx
     divq    %rcx
-    addb    $'0', %dl
+    addb    $48, %dl
     decq    %rsi
     movb    %dl, (%rsi)
     jmp     udigit_loop

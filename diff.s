@@ -1,6 +1,6 @@
 .data
-file1: .asciz "Hi, this is a testfile.\nTestfile 1 to be precise.\nAnother line here.\n"
-file2: .asciz "Hi, this is a testfile.\nTestfile 1 to be precise.\nAnother line here.\n Extra line.\n"
+file1: .asciz "Hi, this is a Testfile.\nTestfile 1 to be precise.\nAnother line here.\n"
+file2: .asciz "Hi, this is a testfile.\nTestfile 1 to be precise.\nAnother line here.\n"
 
 # format strings for output
 change_c: .asciz "c"       # change indicator for differing lines
@@ -121,7 +121,7 @@ diff_loop:
     leaq line2_buf(%rip), %rsi  # buffer for line2
     movq $1024, %rdx            # max length
     call get_line               # read line
-    movq %rax, %r13             # r13 = number of chars read
+    movq %rax, %r13             # r13 = number of chars read 
     movq %rdx, -16(%rbp)        # Update file2 pointer
 
     # check for EOF
