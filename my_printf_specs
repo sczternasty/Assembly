@@ -1,0 +1,90 @@
+
+main() {
+    // call printif function
+    my_printf("My name is %s. I think I'll get a %u for my exam. What does %r do? And %%?","Piet", 10)
+}
+
+my_printf(format_string, args) {
+    arg_index = 0
+    p = format_string
+
+    // loop through each character in the format string
+    while (*p is not null) {
+        if (*p == '%') {
+            p = p + 1     // move to next character
+
+            if (*p == 's') {
+                print_string(args[arg_index])
+                arg_index = arg_index + 1
+            }
+            else if (*p == 'd') {
+                print_signed_int(args[arg_index])
+                arg_index = arg_index + 1
+            }
+            else if (*p == 'u') {
+                print_unsigned_int(args[arg_index])
+                arg_index = arg_index + 1
+            }
+            else if (*p == '%') {
+                print_char('%')
+            }
+            else {
+                // unknown specifier, print it literally
+                print_char('%')
+                print_char(*p)
+            }
+        }
+        else {
+            // regular character
+            print_char(*p)
+        }
+        p = p + 1
+    }
+}
+
+
+print_char(c) {
+    // use system call to write a single character
+    syscall_write(stdout, c, 1)
+}
+
+print_string(s) {
+    if (s is null) return
+
+    // find length
+    length = 0
+    p = s
+    while (*p != '\0') {
+        length = length + 1
+        p = p + 1
+    }
+
+    // write the string
+    syscall_write(stdout, s, length)
+}
+
+print_signed_int(value) {
+    if (value < 0) {
+        print_char('-')
+        value = -value
+    }
+    digits = convert_to_digits(value)
+    print_string(digits)
+}
+
+print_unsigned_int(value) {
+    digits = convert_to_digits(value)
+    print_string(digits)
+}
+
+convert_to_digits(value) {
+    if (value == 0) return "0"
+
+    buffer = ""
+    while (value > 0) {
+        remainder = value % 10
+        buffer = chr(remainder + '0') + buffer
+        value = value / 10
+    }
+    return buffer
+}
