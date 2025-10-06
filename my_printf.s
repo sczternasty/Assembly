@@ -160,7 +160,7 @@ print_char:
     pushq   %rdx
     pushq   %r11
 
-    subq    $16, %rsp              # align stack
+    subq    $16, %rsp              # make space for buffer
     movb    %dil, (%rsp)           # move char to buffer
 
     movq    $1, %rax               # sys_write
