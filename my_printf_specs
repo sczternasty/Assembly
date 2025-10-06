@@ -83,7 +83,7 @@ convert_to_digits(value) {
     buffer = ""
     while (value > 0) {
         remainder = value % 10
-        buffer = chr(remainder + '0') + buffer
+        buffer = chr(remainder + ord('0')) + buffer
         value = value / 10
     }
     return buffer

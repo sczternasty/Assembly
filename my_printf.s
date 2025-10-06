@@ -7,8 +7,8 @@ name:       .ascii "Piet\0"
 
 main:
     # prologue
-    pushq   %rbp                # save base pointer
-    movq    %rsp, %rbp          # set base pointer
+    pushq   %rbp
+    movq    %rsp, %rbp
 
     movq    $format, %rdi       # format string
     movq    $name, %rsi         # first argument
@@ -16,20 +16,19 @@ main:
     call    my_printf
 
     # print newline
-    movq    $10, %rax           # newline ASCII code
+    movq    $10, %rdi           # '\n'
     call    print_char
 
     # epilogue
-    movq %rbp, %rsp             # restore stack pointer
-    popq    %rbp                # restore base pointer
+    movq    %rbp, %rsp
+    popq    %rbp
 
-    # exit program
-    movq    $60, %rax            # syscall number for exit
-    movq    $0, %rdi             # exit code 0
+    movq    $60, %rax           # syscall: exit
+    movq    $0, %rdi
     syscall
 
-
 my_printf:
+    # prologue
     pushq   %rbp
     movq    %rsp, %rbp
 
@@ -53,6 +52,7 @@ format_loop:
     cmpb    $37, %al            # check for '%'
     je      percent             # jump to percent handler if format specifier found
 
+    movb    %al, %dil           # put character into %dil (arg for print_char)
     call    print_char          # print regular character
     incq    %r10                # move to next character
     jmp     format_loop         # repeat loop
@@ -67,47 +67,46 @@ percent:
     je      int
     cmpb    $117, %al           # 'u'
     je      uint
-    cmpb    $37, %al          # '%'
+    cmpb    $37, %al            # '%'
     je      double_percent
 
     # unknown specifier: print '%' and char
-    pushq   %rax                   # save specifier char
-    movq    $37, %rax              # ASCII for '%'
-    call    print_char             # print '%'
-    popq    %rax                   # restore specifier char
-    call    print_char             # print unknown specifier
-    incq    %r10                   # move to next character
-    jmp     format_loop            # get back to format loop
+    movb    $37, %dil          # ASCII for '%'
+    call    print_char          # print '%'
+    movb    %al, %dil           # print unknown specifier
+    call    print_char
+    incq    %r10                # move to next character
+    jmp     format_loop         # get back to format loop
 
 string:
-    call    get_current_arg        # get argument based on index in r11
-    movq    %rax, %rdi             # move argument to rdi for print_string
-    call    print_string           # print the string
-    incq    %r11                   # increment argument index
-    incq    %r10                   # move to next character
-    jmp     format_loop            # go back to format loop
+    call    get_current_arg     # get argument based on index in r11
+    movq    %rax, %rdi          # move argument to rdi for print_string
+    call    print_string        # print the string
+    incq    %r11                # increment argument index
+    incq    %r10                # move to next character
+    jmp     format_loop         # go back to format loop
 
 int:
-    call    get_current_arg        # get argument based on index in r11
-    movq    %rax, %rdi             # move argument to rdi for print_signed_int
-    call    print_signed_int       # print the signed integer
-    incq    %r11                   # increment argument index
-    incq    %r10                   # move to next character
-    jmp     format_loop            # go back to format loop
+    call    get_current_arg     # get argument based on index in r11
+    movq    %rax, %rdi          # move argument to rdi for print_signed_int
+    call    print_signed_int    # print the signed integer
+    incq    %r11                # increment argument index
+    incq    %r10                # move to next character
+    jmp     format_loop         # go back to format loop
 
 uint:
-    call    get_current_arg        # get argument based on index in r11
-    movq    %rax, %rdi             # move argument to rdi for print_unsigned_int
-    call    print_unsigned_int     # print the unsigned integer
-    incq    %r11                   # increment argument index
-    incq    %r10                   # move to next character
-    jmp     format_loop            # go back to format loop
+    call    get_current_arg     # get argument based on index in r11
+    movq    %rax, %rdi          # move argument to rdi for print_unsigned_int
+    call    print_unsigned_int  # print the unsigned integer
+    incq    %r11                # increment argument index
+    incq    %r10                # move to next character
+    jmp     format_loop         # go back to format loop
 
 double_percent:
-    movq    $37, %rax              # ASCII for '%'
-    call    print_char             # print '%'
-    incq    %r10                   # move to next character
-    jmp     format_loop            # go back to format loop
+    movb    $'%', %dil          # ASCII for '%'
+    call    print_char          # print '%'
+    incq    %r10                # move to next character
+    jmp     format_loop         # go back to format loop
 
 format_done:
     # restore registers
@@ -118,18 +117,21 @@ format_done:
     popq    %rcx
     popq    %rdx
     popq    %rsi
-    
+
     # epilogue
     movq    %rbp, %rsp
     popq    %rbp
+    ret
 
-    ret 
 
+# ---------------------------
+# get_current_arg (fixed with lea)
+# ---------------------------
 get_current_arg:
     # determine where the argument is based on index in %r11
-    # arguments 0-4 are in registers, 5+ are on stack
-    cmpq    $0, %r11          
-    je      get_arg0           
+    # arguments 0-4 are in registers (saved on our stack), 5+ are on caller's stack
+    cmpq    $0, %r11
+    je      get_arg0
     cmpq    $1, %r11
     je      get_arg1
     cmpq    $2, %r11
@@ -139,13 +141,12 @@ get_current_arg:
     cmpq    $4, %r11
     je      get_arg4
 
-    # For args >= 6 (on stack)
-    movq    %r11, %rax             # copy index to rax
-    subq    $5, %rax               # adjust index for stack (arg 6 is at index 0 on stack)
-    imulq   $8, %rax, %rax         # multiply by 8 (size of each arg)
-    addq    $16, %rax              # account for saved rbp and return address
-    addq    %rbp, %rax             # get address of argument on stack
-    movq    (%rax), %rax           # load argument from stack
+    # For args >= 5 (index 5 = 6th overall arg), compute:
+    # addr = rbp + 16 + 8 * (index - 5)
+    movq    %r11, %rax        # rax = index
+    subq    $5, %rax          # rax = index - 5
+    lea     16(%rbp, %rax, 8), %rax   # rax = rbp + 16 + 8*(index-5)
+    movq    (%rax), %rax      # load argument from caller stack into rax
     ret
 
 get_arg0: movq -8(%rbp), %rax; ret
@@ -154,7 +155,10 @@ get_arg2: movq -24(%rbp), %rax; ret
 get_arg3: movq -32(%rbp), %rax; ret
 get_arg4: movq -40(%rbp), %rax; ret
 
-# print single character
+
+# ---------------------------
+# print single character in %dil
+# ---------------------------
 print_char:
     pushq   %rax
     pushq   %rdi
@@ -163,7 +167,7 @@ print_char:
     pushq   %r11
 
     subq    $16, %rsp              # align stack
-    movb    %al, (%rsp)            # move char to buffer
+    movb    %dil, (%rsp)           # move char to buffer
 
     movq    $1, %rax               # sys_write
     movq    $1, %rdi               # stdout
@@ -179,7 +183,10 @@ print_char:
     popq    %rax
     ret
 
+
+# ---------------------------
 # print null-terminated string in RDI
+# ---------------------------
 print_string:
     testq   %rdi, %rdi             # check if string pointer is null
     jz      print_string_done      # if null, jump to done
@@ -193,21 +200,21 @@ print_string:
     movq    $0, %rdx               # length = 0
 
 len_loop:
-    movb    (%rsi), %al            # load byte
-    testb   %al, %al               # check for null terminator
-    jz      len_done               # if null, done
-    incq    %rsi                   # move to next char
-    incq    %rdx                   # increment length
-    jmp     len_loop               # repeat
+    movb    (%rsi), %al
+    testb   %al, %al
+    jz      len_done
+    incq    %rsi
+    incq    %rdx
+    jmp     len_loop
 
 len_done:
     movq    $1, %rax               # sys_write
-    pushq   %rdi                   # save original string pointer
-    movq    $1, %rdi               # stdout
-    popq    %rsi                   # restore string pointer
+    pushq   %rdi
+    movq    $1, %rdi
+    popq    %rsi
     syscall
 
-    popq    %r11 
+    popq    %r11
     popq    %rdx
     popq    %rsi
     popq    %rax
@@ -216,6 +223,9 @@ print_string_done:
     ret
 
 
+# ---------------------------
+# print_signed_int (argument in %rdi)
+# ---------------------------
 print_signed_int:
     pushq   %rax
     pushq   %rcx
@@ -224,12 +234,12 @@ print_signed_int:
     pushq   %r11
 
     movq    %rdi, %rax             # copy number to rax
-    testq   %rax, %rax             # check if number is negative
-    jns     positive_int            
+    testq   %rax, %rax
+    jns     positive_int
 
     # negative number
     pushq   %rax                   # save original number
-    movq    $45, %rax              # ASCII for '-'
+    movb    $'-', %dil
     call    print_char             # print '-'
     popq    %rax                   # restore original number
     negq    %rax                   # make positive
@@ -244,17 +254,17 @@ positive_int:
     testq   %rax, %rax             # check if number is 0
     jnz     digit_loop
     decq    %rsi                   # move back one byte
-    movb    $48, (%rsi)            # ASCII for '0'
-    jmp     print_int_string 
+    movb    $'0', (%rsi)           # ASCII for '0'
+    jmp     print_int_string
 
 digit_loop:
-    testq   %rax, %rax             # check if number is 0
+    testq   %rax, %rax
     jz      print_int_string
-    movq    $0, %rdx              # clear rdx for division
-    divq    %rcx                  # rax = rax / 10, rdx = rax % 10
-    addb    $48, %dl              # convert to ASCII
-    decq    %rsi                  # move back one byte
-    movb    %dl, (%rsi)           # store digit
+    xorq    %rdx, %rdx
+    divq    %rcx                   # rax = rax / 10, rdx = rax % 10
+    addb    $'0', %dl              # convert to ASCII
+    decq    %rsi                   # move back one byte
+    movb    %dl, (%rsi)            # store digit
     jmp     digit_loop
 
 print_int_string:
@@ -269,6 +279,10 @@ print_int_string:
     popq    %rax
     ret
 
+
+# ---------------------------
+# print_unsigned_int (argument in %rdi)
+# ---------------------------
 print_unsigned_int:
     pushq   %rax
     pushq   %rcx
@@ -276,33 +290,33 @@ print_unsigned_int:
     pushq   %rsi
     pushq   %r11
 
-    movq    %rdi, %rax             # copy number to rax
-    subq    $32, %rsp              # allocate space for number string
-    movq    %rsp, %rsi             # rsi points to buffer
-    addq    $31, %rsi              # point to end of buffer
-    movb    $0, (%rsi)             # null terminator
-    movq    $10, %rcx              # base 10
+    movq    %rdi, %rax
+    subq    $32, %rsp
+    movq    %rsp, %rsi
+    addq    $31, %rsi
+    movb    $0, (%rsi)
+    movq    $10, %rcx
 
-    testq   %rax, %rax             # check if number is 0
+    testq   %rax, %rax
     jnz     udigit_loop
-    decq    %rsi                   # move back one byte
-    movb    $48, (%rsi)            # ASCII for '0'
+    decq    %rsi
+    movb    $'0', (%rsi)
     jmp     print_uint_string
 
 udigit_loop:
-    testq   %rax, %rax            # check if number is 0
+    testq   %rax, %rax
     jz      print_uint_string
-    movq    $0, %rdx              # clear rdx for division
-    divq    %rcx                  # rax = rax / 10, rdx = rax % 10
-    addb    $48, %dl              # convert to ASCII
-    decq    %rsi                  # move back one byte
-    movb    %dl, (%rsi)           # store digit
+    xorq    %rdx, %rdx
+    divq    %rcx
+    addb    $'0', %dl
+    decq    %rsi
+    movb    %dl, (%rsi)
     jmp     udigit_loop
 
 print_uint_string:
-    movq    %rsi, %rdi           # move string pointer to rdi
-    call    print_string         # print the string
-    addq    $32, %rsp            # restore stack pointer
+    movq    %rsi, %rdi
+    call    print_string
+    addq    $32, %rsp
 
     popq    %r11
     popq    %rsi
