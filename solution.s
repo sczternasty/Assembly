@@ -117,8 +117,10 @@ mouse_isr:
 	
 	movq buffer_index, %r12   # current position in buffer
 	movl $32, %edx
-	subl %r12d, %edx           # remaining space
-	
+	subl %r12d, %edx         # remaining space in buffer
+	cmpl $0, %edx            # check if space is available
+	jle mouse_done
+
 	movb MOUSE, %al           # read status byte
 	testb $0x01, %al          # check data ready
 	je mouse_done
@@ -132,17 +134,17 @@ mouse_isr:
 	
 	leaq buffer(,%r12,1), %rdi # destination
 	movq $left_click, %rsi  # source
-	addq $12, %r12            # length
+	movq $12, %rcx            # length
 	movq $0, %rax 		 # index
 copy_left:
 	movb (%rsi,%rax), %dl  # load byte
 	movb %dl, (%rdi,%rax) # store byte
 	incq %rax 		   
-	cmpq %r12, %rax 
+	cmpq %rcx, %rax 
 	jb copy_left
 
 	movq buffer_index, %r12  # reload buffer index
-	addq $12, %r12            # update buffer index
+	addq $13, %r12            # update buffer index
 	movq %r12, buffer_index   # store back
 	jmp mouse_done
 
@@ -155,13 +157,13 @@ check_right:
 
 	leaq buffer(,%r12,1), %rdi # destination
 	movq $right_click, %rsi # source
-	movq $13, %r12            # length
+	movq $13, %rcx            # length
 	movq $0, %rax             # index
 copy_right:
 	movb (%rsi,%rax), %dl # load byte
 	movb %dl, (%rdi,%rax) # store byte
 	incq %rax
-	cmpq %r12, %rax
+	cmpq %rcx, %rax
 	jb copy_right
 
 	movq buffer_index, %r12
@@ -176,12 +178,12 @@ main_loop:
     pushq %rbp
     movq %rsp, %rbp
 	
-	pushq %r12
     pushq %rbx                 
     movl $0, %ebx              # index = 0
 
 write_loop:
-    movl buffer_index, %r8d    # load the current bound each time
+    movl buffer_index, %r8d   # load the current bound each time
+
     cmpl %r8d, %ebx            # done if ebx >= buffer_index
     jge reset_buffer
 
@@ -215,6 +217,5 @@ clear_loop:
     movq $0, buffer_index      # reset buffer index
 
     popq %rbx
-    popq %r12
     leave
     ret
