@@ -43,22 +43,22 @@ handle_IRQ:
     pushq   %r12
     movq    $0, %rax                   # clear rax to avoid garbage
 
-    movq    $INTERRUPT_VECTOR, %r12    # load interrupt vector base address
+    movq    $INTERRUPT_VECTOR, %r12    # load interrupt vector base address pointer
 
-    movq    $KEYBOARD, %rdi            # keyboard address
+    movq    $KEYBOARD, %rdi            # keyboard address pointer
     movb    (%rdi), %al                # check first byte in keyboard - status
     testb   $0x80, %al                 # check ready bit (bit 7)
     jz      handle_check_mouse
-    movq    (%r12), %rbx               # load keyboard ISR address
+    movq    (%r12), %rbx               # load keyboard ISR address pointer
     call    *%rbx                      # call the ISR
     jmp     handle_done
 
 handle_check_mouse:
-    movq    $MOUSE, %rdi               # mouse address
+    movq    $MOUSE, %rdi               # mouse address pointer
     movb    (%rdi), %al                # check first byte in mouse - status
     testb   $0x80, %al                 # check IRQ bit (bit 7)
     jz      handle_done
-    movq    8(%r12), %rbx              # load mouse ISR address
+    movq    8(%r12), %rbx              # load mouse ISR address pointer with 8 offset
     call    *%rbx                      # call the ISR
 
 handle_done:
@@ -72,7 +72,7 @@ keyboard_isr:
     movq    %rsp, %rbp
     movq    $0, %rax                   # clear rax to avoid garbage
 
-    movq    $KEYBOARD, %rdi            # address of keyboard
+    movq    $KEYBOARD, %rdi            # keyboard address pointer
     movb    1(%rdi), %al               # move to second byte - data
 
     cmpb    $13, %al                   # check if Enter
@@ -92,7 +92,7 @@ keyboard_append:
     movb    %al, (%rdi,%rdx)           # store char at buffer+idx
 
     incq    %rdx                       # advance index
-    movq    $buffer_index, %rcx        # load index address
+    movq    $buffer_index, %rcx        # load index address pointer
     movq    %rdx, (%rcx)               # store updated index
 
 keyboard_done:
@@ -114,12 +114,12 @@ mouse_isr:
     jmp     mouse_done
 
 mouse_left:
-    movq    $left_click_str, %rdi      # address of left click string
+    movq    $left_click_str, %rdi      # address pointer of left click string
     movq    $12, %rsi                  # length of string
     jmp     click_append
 
 mouse_right:
-    movq    $right_click_str, %rdi     # address of right click string
+    movq    $right_click_str, %rdi     # address pointer of right click string
     movq    $13, %rsi                  # length of string
 
 click_append:
@@ -131,8 +131,8 @@ click_append:
     cmpq    $32, %rcx                  # check if new index is not out of buffer size
     ja      mouse_done
 
-    movq    %rdi, %r8                  # source string address
-    movq    $buffer, %rdi              # buffer address
+    movq    %rdi, %r8                  # source string address pointer
+    movq    $buffer, %rdi              # buffer address pointer
     movq    $0, %rax                   # index for source string
 
 append_loop:
