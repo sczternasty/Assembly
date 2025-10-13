@@ -144,7 +144,7 @@ copy_loop:
     # open file for writing
     movq $2, %rax                # sys_open
     movq $filename, %rdi          
-    movq $0101, %rsi             # O_CREAT | O_WRONLY
+    movq $0101, %rsi             
     movq $0644, %rdx             # perms
     syscall
     movq %rax, %r13              # file descriptor
@@ -227,9 +227,9 @@ copy_loop:
     movq $0, %rdi
     syscall
 
+
 # (src=rdi, dest=rsi)
 rle_encode:
-
     push %rbp
     movq %rsp, %rbp
 
@@ -238,27 +238,27 @@ rle_encode:
     movb (%rdi), %bl        # first byte
     cmpb $0, %bl            # check for empty input
     je rle_enc_done
-    movq %rsi, %r8         # save start of output buffer
+    movq %rsi, %r8          # save start of output buffer
 rle_enc_loop:
     movb (%rdi), %al        # load byte
-    cmpb $0, %al          # check for null terminator
+    cmpb $0, %al            # check for null terminator
     je rle_enc_done
     movb %al, %bl           # current byte
     movq $1, %rcx           # count = 1
 rle_count_loop:
-    inc %rdi                  # advance input pointer
-    movb (%rdi), %al          # load next byte
-    cmpb %al, %bl             # compare with current byte
+    inc %rdi                # advance input pointer
+    movb (%rdi), %al        # load next byte
+    cmpb %al, %bl           # compare with current byte
     jne rle_write
-    inc %rcx                  # increment count
-    cmp $255, %rcx            # max count reached?
+    inc %rcx                # increment count
+    cmp $255, %rcx          # max count reached?
     jne rle_count_loop
 rle_write:
-    movb %bl, (%rsi)         # VALUE
-    inc %rsi                 # advance output pointer
-    movb %cl, (%rsi)         # COUNT
-    inc %rsi                 # advance output pointer
-    cmpb $0, %al             # check for null terminator
+    movb %cl, (%rsi)        # COUNT first
+    inc %rsi
+    movb %bl, (%rsi)        # VALUE second
+    inc %rsi
+    cmpb $0, %al            # check for null terminator
     jne rle_enc_loop
 rle_enc_done:
     subq %r8, %rsi          # length = output - start
@@ -268,12 +268,13 @@ rle_enc_done:
     pop %rbp
     ret
 
+
 # src=rdi, key=rsi, dest=rdx, len=rcx)
 encrypt:
     push %rbp
     movq %rsp, %rbp
 xor_loop:
-    test %rcx, %rcx # check for zero length
+    cmpq $0, %rcx          # check for zero length
     jz xor_done
     movb (%rdi), %al       # load byte
     xorb (%rsi), %al      # XOR with key byte
@@ -294,26 +295,25 @@ decrypt:
 
 # (src=rdi, dest=rsi)
 rle_decode:
-
     push %rbp
     movq %rsp, %rbp
 
     movq %rsi, %r8           # save start of output buffer
 rle_dec_loop:
-    movb (%rdi), %al         # VALUE
-    cmpb $0, %al             # check for null terminator
-    je rle_dec_done 
-    inc %rdi                 # advance pointer
-    movb (%rdi), %cl         # COUNT
+    movb (%rdi), %cl         # COUNT first
     cmpb $0, %cl             # check for zero COUNT
+    je rle_dec_done
+    inc %rdi                 # advance pointer
+    movb (%rdi), %al         # VALUE second
+    cmpb $0, %al             # check for null terminator (optional)
     je rle_dec_done
     inc %rdi                 # advance pointer
 rle_dec_write:
     movb %al, (%rsi)         # write VALUE
-    inc %rsi                 # advance pointer
-    dec %cl                  # decrement COUNT
+    inc %rsi
+    dec %cl
     jnz rle_dec_write
-    jmp rle_dec_loop 
+    jmp rle_dec_loop
 rle_dec_done:
     movb $0, (%rsi)          # null terminator
     subq %r8, %rsi           # length = output - start
@@ -322,6 +322,7 @@ rle_dec_done:
     movq %rbp, %rsp
     pop %rbp
     ret
+
 
 clear_buffer:
     push %rbp
@@ -339,6 +340,7 @@ clear_buffer_done:
     popq %rbp
     ret
 
+# (dist, src)
 strcpy_custom:
     push %rbp
     movq %rsp, %rbp
@@ -357,8 +359,9 @@ strcpy_loop:
     pop %rbp
     ret
 
+# (rdi=string)
 strlen:
-    push %rbp
+    pushq %rbp
     movq %rsp, %rbp
     movq $0, %rax
 str_loop:
@@ -372,12 +375,20 @@ str_done:
     ret
 
 print_string:
-    push %rdi
+
+    pushq %rbp
+    movq %rsp, %rbp
+
+    pushq %rdi
     call strlen           # get length
     movq %rax, %rdx              # length in rdx
-    pop %rsi                     # string pointer in rsi
+    popq %rsi                # string pointer in rsi
 
     movq $1, %rax                # sys_write
     movq $1, %rdi                # stdout
     syscall
+
+    movq %rbp, %rsp
+    popq %rbp
+
     ret

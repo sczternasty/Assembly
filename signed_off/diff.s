@@ -1,6 +1,6 @@
 .data
-file1: .asciz "Hi, this is a Testfile.\nTestfile 1 to be precise.\nAnother line here.\n"
-file2: .asciz "Hi, this is a testfile.\nTestfile 1 to be precise.\nAnother line here.\n"
+file1: .asciz ""
+file2: .asciz ""
 
 # format strings for output
 change_c: .asciz "c"       # change indicator for differing lines
@@ -27,14 +27,19 @@ main:
     pushq %rbp
     movq %rsp, %rbp
 
+    pushq %r12     # save callee-saved registers
+    pushq %r13
+    pushq %r14
+    pushq %r15
+
     # save command line args
-    movq %rdi, %r14     # argc
-    movq %rsi, %r15     # argv
+    movq %rdi, %r14     # number of args
+    movq %rsi, %r15     # argument values
 
     movq $0, %r12       # flag_i = 0 (ignore case)
     movq $0, %r13       # flag_B = 0 (ignore blank lines)
 
-    cmpq $1, %r14      # if argc <= 1, no options provided
+    cmpq $1, %r14       # if argc <= 1, no options
     jle call_diff
 
     movq $1, %rcx        # start parsing argv
@@ -44,14 +49,14 @@ parse_loop:
     jge call_diff        
 
     # -i option
-    movq (%r15,%rcx,8), %rdi    # argv[rcx]
+    movq (%r15,%rcx,8), %rdi    # argv[rcx] (r15 + rcx*8)
     movq $opt_i, %rsi      # memory address of "-i"
     call strcmp                 # compare strings
     testq %rax, %rax            # check if equal
     jz set_i
 
     # -B option
-    movq (%r15,%rcx,8), %rdi   # argv[rcx]
+    movq (%r15,%rcx,8), %rdi   # argv[rcx] (r15 + rcx*8)
     movq $opt_B, %rsi           # memory address of "-B"
     call strcmp                # compare strings
     testq %rax, %rax           # check if equal
@@ -77,11 +82,19 @@ call_diff:
     movq %r13, %rcx         # flag_B
     call diff
 
+    # restore callee-saved registers
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+
     # epilogue
     movq %rbp, %rsp
     popq %rbp
     movq $0, %rdi
     call exit
+
+
 
 diff:
 

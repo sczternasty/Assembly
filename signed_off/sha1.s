@@ -11,7 +11,7 @@ sha1_chunk:
     pushq   %r14
     pushq   %r15
 
-    # load initial hash state
+    # load initial hash state (sha1 offsets by 4 bytes)
     movl    0(%rdi), %r8d    # h0 = a
     movl    4(%rdi), %r9d    # h1 = b
     movl    8(%rdi), %r10d   # h2 = c

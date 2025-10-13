@@ -30,10 +30,17 @@ buffer:
     .quad 0, 0, 0, 0      # 32 bytes buffer
 
 .text
-.globl handle_IRQ
-.globl keyboard_isr
-.globl mouse_isr
-.globl main_loop
+.globl main
+
+main:
+
+    pushq %rbp
+    movq %rsp, %rbp
+
+    call main_loop
+
+    popq %rbp
+    ret
 
 poll_device:
 
@@ -68,7 +75,7 @@ handle_IRQ:
     pushq %rbp
     movq %rsp, %rbp
 
-    movb KEYBOARD, %rdi        # read STATUS byte
+    movq KEYBOARD, %rdi        # read STATUS byte
     call poll_device
     cmpb $0, %al          # check if data available
     jz next_device
@@ -78,7 +85,7 @@ handle_IRQ:
 
 next_device:
 
-    movq $MOUSE, %rdi             # check mouse irq
+    movq MOUSE, %rdi             # check mouse irq
     call poll_device
     cmpb $0, %al                  # check if data available
     jz irq_done
@@ -148,8 +155,9 @@ mouse_isr:
     movq $12, %rcx          # length
     movq $0, %rax           # counter
 copy_left_click:
-    movb (%rsi,%rax,1), %dl # load byte from source
-    movb %dl, (%rdi,%rax,1) # store byte to destination
+
+    movb (%rsi,%rax), %dl # load byte from source
+    movb %dl, (%rdi,%rax) # store byte to destination
     incq %rax               # increment counter
     cmpq %rcx, %rax         # compare with length
     jb copy_left_click      # repeat if not done
@@ -168,8 +176,8 @@ check_right:
     movq $13, %rcx              # length
     movq $0, %rax               # counter
 copy_right_click:
-    movb (%rsi,%rax,1), %dl     # load byte from source
-    movb %dl, (%rdi,%rax,1)     # store byte to destination
+    movb (%rsi,%rax), %dl     # load byte from source
+    movb %dl, (%rdi,%rax)     # store byte to destination
     incq %rax                    # increment counter
     cmpq %rcx, %rax              # compare with length
     jb copy_right_click          # repeat if not done

@@ -1,6 +1,5 @@
 .data
-format:     .ascii "My name is %s. I think I'll get a %u for my exam. What does %r do? And %%?\0"
-name:       .ascii "Piet\0"
+format:     .ascii ""
 
 .text
 .global main
@@ -11,8 +10,8 @@ main:
     movq    %rsp, %rbp
 
     movq    $format, %rdi       # format string
-    movq    $name, %rsi         # first argument
-    movq    $10, %rdx           # second argument
+    #movq    $name, %rsi         # first argument
+    movq    $0, %rsi           # second argument
     call    my_printf
 
     # print newline
