@@ -1,221 +1,215 @@
 .data
-.globl KEYBOARD
-.globl MOUSE
-.globl MONITOR
+    .globl KEYBOARD
+	.global MOUSE
+	.global MONITOR
 KEYBOARD:
-	.byte 0x00
-	.byte 0x00
-	.byte 0x00
+    .byte 0x00    # status
+    .byte 0x00    # data in
+    .byte 0x00    # data out
 MOUSE:
-	.byte 0x00
-	.byte 0x00
-	.byte 0x00
+    .byte 0x00
+    .byte 0x00
+    .byte 0x00
 MONITOR:
-	.byte 0x00
-	.byte 0x00
-	.byte 0x00
-INTERRUPT_VECTOR:
-	.quad keyboard_isr
-	.quad mouse_isr
+    .byte 0x00
+    .byte 0x00
+    .byte 0x00
 
-left_click: .ascii "*left click*\0"
-right_click: .ascii "*right click*\0"
+
+INTERRUPT_VECTOR:
+    .quad keyboard_isr 
+    .quad mouse_isr
+
+left_click_str: .ascii "*left click*\0"
+
+right_click_str: .ascii "*right click*\0"
 
 .bss
 buffer:
-	.quad 0,0,0,0
+    .quad 0,0,0,0
 
 buffer_index:
-	.quad 0
+    .quad 0                            # current index in buffer
 
 .global buffer
-.global handle_IRQ
+.globl handle_IRQ
 .global main_loop
 
 .text
-poll_device:
-	pushq %rbp
-	movq %rsp, %rbp
-	
-	movb (%rdi), %al       # load status byte
-	andb $0x08, %al        # check ready bit (bit 7)
-
-	leave
-	ret
-
-call_ISR:
-	pushq %rbp
-	movq %rsp, %rbp
-
-	push %r12
-	
-	movq INTERRUPT_VECTOR(,%rdi,8), %rax  # load ISR address
-	call *%rax                             # call the ISR
-	
-	pop %r12
-	leave
-	ret
-
 handle_IRQ:
-	pushq %rbp
-	movq %rsp, %rbp
-	
-	movq $KEYBOARD, %rdi   # check keyboard
-	call poll_device
-	cmpb $0, %al  			# if not ready
-	jz check_mouse
-	movq $0, %rdi          # device 0 = keyboard
-	call call_ISR
-	jmp irq_done
+    pushq   %rbp
+    movq    %rsp, %rbp
+    pushq   %rbx
+    pushq   %r12
+    movq    $0, %rax                   # clear rax to avoid garbage
 
-check_mouse:
-	movq $MOUSE, %rdi      # check mouse
-	call poll_device
-	cmpb $0, %al           # if not ready
-	jz irq_done
-	movq $1, %rdi          # device 1 = mouse
-	call call_ISR
+    movq    $INTERRUPT_VECTOR, %r12    # load interrupt vector base address
 
-irq_done:
-	leave
-	ret
+    movq    $KEYBOARD, %rdi            # keyboard address
+    movb    (%rdi), %al                # check first byte in keyboard - status
+    testb   $0x80, %al                 # check ready bit (bit 7)
+    jz      handle_check_mouse
+    movq    (%r12), %rbx               # load keyboard ISR address
+    call    *%rbx                      # call the ISR
+    jmp     handle_done
+
+handle_check_mouse:
+    movq    $MOUSE, %rdi               # mouse address
+    movb    (%rdi), %al                # check first byte in mouse - status
+    testb   $0x80, %al                 # check IRQ bit (bit 7)
+    jz      handle_done
+    movq    8(%r12), %rbx              # load mouse ISR address
+    call    *%rbx                      # call the ISR
+
+handle_done:
+    popq    %r12
+    popq    %rbx
+    leave
+    ret
 
 keyboard_isr:
-	pushq %rbp
-	movq %rsp, %rbp
-	
-	movq buffer_index, %r12   # load buffer index from memory
-	
-	movb KEYBOARD, %al        # read status byte
-	testb $0x01, %al          # check data ready bit
-	je kbd_done
-	
-	cmpl $32, %r12d            # check if buffer full
-	jge kbd_done
-	
-	movb KEYBOARD+1, %al      # read data byte
-	
-	cmpb $13, %al             # enter key
-	je kbd_append
-	cmpb $32, %al             # below space
-	jb kbd_done
-	cmpb $127, %al            # above DEL
-	ja kbd_done
+    pushq   %rbp
+    movq    %rsp, %rbp
+    movq    $0, %rax                   # clear rax to avoid garbage
 
-kbd_append:
-	movb %al, buffer(%r12)    # store in buffer
-	incq %r12                  # increment buffer index
-	movq %r12, buffer_index     # store new index back to memory
+    movq    $KEYBOARD, %rdi            # address of keyboard
+    movb    1(%rdi), %al               # move to second byte - data
 
-kbd_done:
-	leave
-	ret
+    cmpb    $13, %al                   # check if Enter
+    je      keyboard_append
+    cmpb    $32, %al                   # check if in range of printable (space)
+    jb      keyboard_done
+    cmpb    $127, %al                  # check if in range of printable (DEL)
+    ja      keyboard_done
+
+keyboard_append:
+    movq    $buffer_index, %rdx        # load index
+    movq    (%rdx), %rdx               # rdx = idx
+    cmpq    $32, %rdx                  # check if there is space in buffer
+    jae     keyboard_done 
+
+    movq    $buffer, %rdi              # rdi = buffer address pointer
+    movb    %al, (%rdi,%rdx)           # store char at buffer+idx
+
+    incq    %rdx                       # advance index
+    movq    $buffer_index, %rcx        # load index address
+    movq    %rdx, (%rcx)               # store updated index
+
+keyboard_done:
+    leave
+    ret
 
 mouse_isr:
-	pushq %rbp
-	movq %rsp, %rbp
-	
-	movq buffer_index, %r12   # current position in buffer
-	movl $32, %edx
-	subl %r12d, %edx         # remaining space in buffer
-	cmpl $0, %edx            # check if space is available
-	jle mouse_done
+    pushq   %rbp 
+    movq    %rsp, %rbp
+    pushq   %rbx
+    movq    $0, %rax                   # clear rax to avoid garbage
 
-	movb MOUSE, %al           # read status byte
-	testb $0x01, %al          # check data ready
-	je mouse_done
-	
-	movb MOUSE+1, %al         # read data byte
-	cmpb $1, %al              # left click
-	jne check_right
-	
-	cmpl $12, %edx            # need 12 bytes
-	jl mouse_done
-	
-	leaq buffer(,%r12,1), %rdi # destination
-	movq $left_click, %rsi  # source
-	movq $12, %rcx            # length
-	movq $0, %rax 		 # index
-copy_left:
-	movb (%rsi,%rax), %dl  # load byte
-	movb %dl, (%rdi,%rax) # store byte
-	incq %rax 		   
-	cmpq %rcx, %rax 
-	jb copy_left
+    movq    $MOUSE, %rdi               # mouse address
+    movb    1(%rdi), %al               # move to second byte - data
+    cmpb    $1, %al                    # left click
+    je      mouse_left
+    cmpb    $2, %al                    # right click
+    je      mouse_right
+    jmp     mouse_done
 
-	movq buffer_index, %r12  # reload buffer index
-	addq $13, %r12            # update buffer index
-	movq %r12, buffer_index   # store back
-	jmp mouse_done
+mouse_left:
+    movq    $left_click_str, %rdi      # address of left click string
+    movq    $12, %rsi                  # length of string
+    jmp     click_append
 
-check_right:
-	cmpb $2, %al              # right click
-	jne mouse_done
-	
-	cmpl $13, %edx            # need 13 bytes
-	jl mouse_done
+mouse_right:
+    movq    $right_click_str, %rdi     # address of right click string
+    movq    $13, %rsi                  # length of string
 
-	leaq buffer(,%r12,1), %rdi # destination
-	movq $right_click, %rsi # source
-	movq $13, %rcx            # length
-	movq $0, %rax             # index
-copy_right:
-	movb (%rsi,%rax), %dl # load byte
-	movb %dl, (%rdi,%rax) # store byte
-	incq %rax
-	cmpq %rcx, %rax
-	jb copy_right
+click_append:
+    movq    $buffer_index, %rdx        # buffer_index address pointer
+    movq    (%rdx), %rbx               # rbx = idx
+    
+    movq    %rsi, %rcx                 # length of string to append
+    addq    %rbx, %rcx                 # new index after append
+    cmpq    $32, %rcx                  # check if new index is not out of buffer size
+    ja      mouse_done
 
-	movq buffer_index, %r12
-	addq $13, %r12            # update buffer index
-	movq %r12, buffer_index
+    movq    %rdi, %r8                  # source string address
+    movq    $buffer, %rdi              # buffer address
+    movq    $0, %rax                   # index for source string
+
+append_loop:
+    cmpq    %rcx, %rbx                 # compare new index with current length
+    jae     append_done
+    movb    (%r8,%rax), %dl            # load byte from source
+    movb    %dl, (%rdi,%rbx)           # store byte in buffer
+    incq    %rbx                       # increment buffer index
+    incq    %rax                       # increment source index
+    jmp     append_loop
+    
+append_done:
+    movq    $buffer_index, %rdx        # buffer_index address pointer
+    movq    %rbx, (%rdx)               # update buffer_index
 
 mouse_done:
-	leave
-	ret
+    popq    %rbx
+    leave
+    ret
 
 main_loop:
-    pushq %rbp
-    movq %rsp, %rbp
-	
-    pushq %rbx                 
-    movl $0, %ebx              # index = 0
+    pushq   %rbp
+    movq    %rsp, %rbp
 
-write_loop:
-    movl buffer_index, %r8d   # load the current bound each time
+    pushq   %rbx          
+    pushq   %r12
+    pushq   %r13
+    pushq   %r14
 
-    cmpl %r8d, %ebx            # done if ebx >= buffer_index
-    jge reset_buffer
+    movq    $buffer_index, %rdx        # buffer_index address pointer
+    movq    (%rdx), %r13               # r13 = idx
+    cmpq    $0, %r13                   # if no data, skip
+    jz      main_done
+
+    movq    $buffer, %r12              # buffer address pointer
+
+    movq    $1, %rax                   # sys_write
+    movq    $1, %rdi                   # stdout
+    movq    %r12, %rsi                 # buffer address pointer
+    movq    %r13, %rdx                 # count
+    syscall
+
+    movq    $MONITOR, %r14             # MONITOR address pointer
+    movq    $0, %rbx                   # i = 0
+
+monitor_loop:
+    cmpq    %r13, %rbx                 # while (i < len)
+    jae     clear_buffer
 
 wait_ready:
-    movb MONITOR, %al          # read monitor status
-    testb $0x01, %al           # check ready bit
-    jz wait_ready
+    movb    (%r14), %al                # MONITOR status
+    testb   $0x01, %al                 # ready bit?
+    jz      wait_ready
 
-    movb buffer(%rbx), %al     # byte to send
-    movb %al, MONITOR+2        
+    movb    (%r12,%rbx), %al           # char at buffer + idx
+    movb    %al, 2(%r14)               # MONITOR data_out = al
+    incq    %rbx                       # advance i
+    jmp     monitor_loop
 
-    movq $1, %rax 		   # sys_write
-    movq $1, %rdi 			# stdout
-    leaq buffer(%rbx), %rsi  # address of byte
-    movq $1, %rdx 	# length 1
-    syscall                    
+clear_buffer:
+    movq    $buffer, %rdi              # buffer address pointer
+    movq    $32, %rcx                  # 32 bytes to clear
+    movq    $0, %rax                   
 
-    incl %ebx
-    jmp write_loop
+zero_loop:
+    movb    %al, (%rdi)                # clear byte
+    incq    %rdi                       # next byte
+    decq    %rcx                       # decrement count
+    jnz     zero_loop
 
-reset_buffer:
-    movq $buffer, %rdi         # buffer pointer
-    movq $4, %rcx              # 4 qwords = 32 bytes
-    movq $0, %rax
-clear_loop:
-    movq %rax, (%rdi)
-    addq $8, %rdi
-    decq %rcx
-    jnz clear_loop
+    movq    $buffer_index, %rsi        # buffer_index address pointer
+    movq    $0, (%rsi)                 # reset index to 0
 
-    movq $0, buffer_index      # reset buffer index
-
-    popq %rbx
+main_done:
+    popq    %r14
+    popq    %r13
+    popq    %r12
+    popq    %rbx
     leave
     ret
